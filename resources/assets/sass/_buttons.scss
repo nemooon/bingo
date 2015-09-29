@@ -1,0 +1,7 @@
+
+.btn-white-outline {
+  @include button-outline-variant(#fff);
+  @include hover-focus-active {
+    color: $gray-dark;
+  }
+}

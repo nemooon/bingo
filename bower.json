@@ -1,0 +1,23 @@
+{
+  "name": "bingo",
+  "version": "1.0.0",
+  "authors": [
+    "Keisuke Nemoto <n@on-lab.jp>"
+  ],
+  "description": "",
+  "main": "",
+  "moduleType": [],
+  "license": "MIT",
+  "homepage": "",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "bootstrap": "4.0.0-alpha",
+    "font-awesome": "~4.4.0"
+  }
+}
