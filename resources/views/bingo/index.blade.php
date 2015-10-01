@@ -27,7 +27,7 @@
       </div>
 
       <div class="row">
-        
+
         <div class="bingo-col col-b">
           <h2 class="bingo-label">B</h2>
           <div class="bingo-numbers">
@@ -83,21 +83,26 @@
 
       <div class="row" style="padding: 20px 0;">
 
-        <div class="col-sm-4">
-          <button id="start" type="button" class="btn btn-white-outline btn-lg btn-block" disabled>Start</button>
+        <div class="col-sm-1">
+          <button id="se" type="button" class="btn btn-white-outline btn-lg btn-block"><i class="fa fa-clone"></i></button>
         </div>
 
-        <div class="col-sm-4">
-          <button id="se" type="button" class="btn btn-white-outline btn-lg btn-block">SE</button>
-        </div>
-
-        <div class="col-sm-4">
+        <div class="col-sm-4 col-sm-offset-7">
           <button id="call" type="button" class="btn btn-white-outline btn-lg btn-block" disabled>Call</button>
         </div>
 
       </div>
 
     </div>
+
+    <div class="modal fade" id="result" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+      <div class="modal-dialog" role="document">
+        <div class="jumbotron">
+          <h1 id="call-result" class="display-4" style="padding: 6rem 0; font-size: 12rem; font-weight: 600;"></h1>
+        </div>
+      </div>
+    </div>
+
 
     <script src="/js/jquery.min.js"></script>
     <script src="/js/bootstrap.min.js"></script>
@@ -179,9 +184,25 @@
         start()
           .then(hloop)
           .then(vloop)
-          // .then(blink)
           .done(function(){
-            $('#start').removeAttr('disabled');
+            $.ajax({
+              type: 'POST',
+              url: '{{ route('start') }}',
+              success: function(data) {
+                $('#game-token').text(data.game_token);
+                blink()
+                  .done(function() {
+                    $.each(data.numbers, function(i, number) {
+                      var num = $('.bingo-number i').eq(i);
+                      num.data('number', number.id);
+                      num.attr('data-number', number.id);
+                      num.text(number.label);
+                      num.toggleClass('active', number.call_at != null);
+                    });
+                    $('#call').removeAttr('disabled');
+                  });
+              }
+            });
           });
     });
     $.ajaxSetup({
@@ -190,53 +211,58 @@
       }
     });
     var context = new AudioContext();
-    $(function() {
-      $('#start').on('click', function() {
-        $.ajax({
-          type: 'POST',
-          url: '{{ route('start') }}',
-          success: function(data) {
-            $('#game-token').text(data.game_token);
-            $('#start').attr('disabled', 'disabled');
-            $('#call').removeAttr('disabled');
-            blink()
-              .done(function() {
-                show('そんじゃ、楽しいビンゴを始めましょうか');
-                $.each(data.numbers, function(i, number) {
-                  var num = $('.bingo-number i').eq(i);
-                  num.data('number', number.id);
-                  num.attr('data-number', number.id);
-                  num.text(number.label);
-                  num.toggleClass('active', number.call_at != null);
-                });
-              });
-          }
-        });
-      });
-      $('#call').on('click', function() {
+    var callAudioData;
+    function lodeSECall() {
+      var request = new XMLHttpRequest();
+      request.open('GET', '/sound/nc51953.mp3', true);
+      request.responseType = 'arraybuffer';
+      request.onload = function(){
+        callAudioData = request.response;
+      }
+      request.send();
+    }
+    function SECall(callback) {
+      context.decodeAudioData(callAudioData, function(buffer) {
         var source = context.createBufferSource();
         source.connect(context.destination);
-        var request = new XMLHttpRequest();
-        request.open('GET', '/sound/nc51953.mp3', true);
-        request.responseType = 'arraybuffer';
-        request.onload = function(){
-          context.decodeAudioData(request.response, function(buffer) {
-            source.buffer = buffer;
-            $.ajax({
-              type: 'POST',
-              url: '{{ route('call') }}',
-              success: function(data) {
-                var $number = $('.bingo-number i[data-number='+data.call_number+']');
-                source.start(0);
-                setTimeout(function (){
-                  show($number.text());
-                  $number.addClass('active');
-                }, 2000);
-              }
+        source.buffer = buffer;
+        source.start(0);
+      });
+      setTimeout(callback, 2000);
+    }
+    function SEShow(text) {
+      var request = new XMLHttpRequest();
+      request.open('GET', '/voicetext/'+text, true);
+      request.responseType = 'arraybuffer';
+      request.onload = function(){
+        context.decodeAudioData(request.response, function(buffer) {
+          var source = context.createBufferSource();
+          source.connect(context.destination);
+          source.buffer = buffer;
+          source.start(0);
+        });
+      }
+      request.send();
+    }
+    $(function() {
+      lodeSECall();
+      $('#call').on('click', function() {
+        $.ajax({
+          type: 'POST',
+          url: '{{ route('call') }}',
+          success: function(data) {
+            var $number = $('.bingo-number i[data-number='+data.call_number+']');
+            var $col = $number.closest('.bingo-col');
+            var $label = $col.find('.bingo-label');
+            SECall(function (){
+              SEShow($number.text());
+              $('#call-result').closest('.jumbotron').css('background-color', $col.css('background-color'));
+              $('#call-result').text($label.text()+'-'+$number.text());
+              $('#result').modal();
+              $number.addClass('active');
             });
-          });
-        }
-        request.send();
+          }
+        });
       });
       $('#reset').on('click', function() {
         $.ajax({
@@ -246,29 +272,15 @@
             blink()
               .done(function() {
                 $('#game-token').text('---');
-                $('#start').removeAttr('disabled');
                 $('#call').attr('disabled', 'disabled');
               });
           }
         });
       });
-      function show(text) {
-        var request = new XMLHttpRequest();
-        request.open('GET', '/voicetext/'+text, true);
-        request.responseType = 'arraybuffer';
-        request.withCredentials = true;
-        request.send('');
-        request.onload = function(){
-          context.decodeAudioData(request.response, function(buffer) {
-            var source = context.createBufferSource();
-            source.buffer = buffer;
-            source.connect(context.destination);
-            source.start(0);
-          });
-        }
-      }
     });
-    // $('#se').on('click');
+    $('#se').on('click', function() {
+      $('#result').modal();
+    });
     </script>
   </body>
 </html>

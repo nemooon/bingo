@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Storage;
 use App\Game;
 use App\Number;
 use Illuminate\Http\Request;
@@ -80,26 +81,26 @@ class BingoController extends Controller
 
     public function voicetext($text)
     {
-        \Uzulla\WebApi\VoiceText\Query::$defaultApiKey = 'zn17t88ibywm8aht';
-        $query = new VTQ;
-        $query->text = $text;
-        $query->speaker = 'show';
-        $query->format = 'wav';
-        // $query->emotion = 'happiness';
-        // $query->emotion_level = 4;
-        $query->pitch = 120;
-        $query->speed = 90;
-        $query->volume = 120;
+        $filename = 'voicetext/'.$text.'.wav';
 
-        $res = VTR::getResponse($query);
-
-        if($res->isSuccess()){
-            return response()->download($res->tempFileName);
-        }else{
-            echo "request fail.";
-            var_dump($res);
+        if (!Storage::disk('local')->exists($filename)) {
+            \Uzulla\WebApi\VoiceText\Query::$defaultApiKey = 'zn17t88ibywm8aht';
+            $query = new VTQ;
+            $query->text = $text;
+            $query->speaker = 'show';
+            $query->format = 'wav';
+            $query->pitch = 125;
+            $query->speed = 90;
+            $query->volume = 120;
+            $res = VTR::getResponse($query);
+            if ($res->isSuccess()) {
+                Storage::disk('local')->put($filename, file_get_contents($res->tempFileName));
+            } else {
+                dd($res);
+            }
         }
 
+        return response()->download(storage_path('app/'.$filename));
     }
 
 }
